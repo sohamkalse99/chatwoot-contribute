@@ -138,3 +138,18 @@ Thanks goes to all these [wonderful people](https://www.chatwoot.com/docs/contri
 
 
 *Chatwoot* &copy; 2017-2025, Chatwoot Inc - Released under the MIT License.
+
+## Additional Modifications for local setup
+
+1. Change ruby's version to 3.2.2 for local setup in Gemfile
+2. Made changes in app/models/installation_config.rb file
+3. Made changes in lib/vapid_service.rb
+4. Changes for Postgresql
+    1. brew install postgresql 
+    2. brew install pgvector 
+    3. brew services start postgresql
+    4. createuser postgres
+    5. psql postgres
+        1. alter user postgres SUPERUSER
+        2. alter user postgres CREATEDB
+        3. You can check user permission using \du
