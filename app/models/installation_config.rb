@@ -1,48 +1,40 @@
-# == Schema Information
-#
-# Table name: installation_configs
-#
-#  id               :bigint           not null, primary key
-#  locked           :boolean          default(TRUE), not null
-#  name             :string           not null
-#  serialized_value :jsonb            not null
-#  created_at       :datetime         not null
-#  updated_at       :datetime         not null
-#
-# Indexes
-#
-#  index_installation_configs_on_name                 (name) UNIQUE
-#  index_installation_configs_on_name_and_created_at  (name,created_at) UNIQUE
-#
 class InstallationConfig < ApplicationRecord
-  # https://stackoverflow.com/questions/72970170/upgrading-to-rails-6-1-6-1-causes-psychdisallowedclass-tried-to-load-unspecif
-  # https://discuss.rubyonrails.org/t/cve-2022-32224-possible-rce-escalation-bug-with-serialized-columns-in-active-record/81017
-  # FIX ME : fixes breakage of installation config. we need to migrate.
-  # Fix configuration in application.rb
-  serialize :serialized_value, coder: YAML, type: ActiveSupport::HashWithIndifferentAccess
+  # Remove the serialize line entirely and handle JSON directly
+  # since the column is already JSONB
 
   before_validation :set_lock
   validates :name, presence: true
-
-  # TODO: Get rid of default scope
-  # https://stackoverflow.com/a/1834250/939299
   default_scope { order(created_at: :desc) }
   scope :editable, -> { where(locked: false) }
-
   after_commit :clear_cache
 
   def value
-    # This is an extra hack again cause of the YAML serialization, in case of new object initialization in super admin
-    # It was throwing error as the default value of column '{}' was failing in deserialization.
-    return {}.with_indifferent_access if new_record? && @attributes['serialized_value']&.value_before_type_cast == '{}'
+    return [] if new_record? && serialized_value.blank?
 
-    serialized_value[:value]
+    # Handle different possible data structures
+    if serialized_value.is_a?(Hash)
+      # If serialized_value has a 'value' key, return that
+      extracted_value = serialized_value.try(:[], 'value') || serialized_value.try(:[], :value)
+
+      # If no 'value' key exists, return the entire hash if it looks like an array structure
+      # Otherwise return empty array for consistency
+      result = extracted_value || serialized_value
+
+      # Ensure we return an array for compatibility with the + operator
+      return result.is_a?(Array) ? result : []
+    elsif serialized_value.is_a?(Array)
+      # If it's already an array, return it as-is
+      return serialized_value
+    else
+      # For any other data type, return empty array
+      return []
+    end
   end
 
   def value=(value_to_assigned)
     self.serialized_value = {
-      value: value_to_assigned
-    }.with_indifferent_access
+      'value' => value_to_assigned
+    }
   end
 
   private
